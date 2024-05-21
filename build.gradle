@@ -1,0 +1,44 @@
+plugins {
+  id 'war'
+  id 'com.palantir.git-version' version '3.0.0'
+  id 'com.github.ben-manes.versions' version '0.51.0'
+  id 'java'
+  id 'java-library'
+  id 'eclipse'
+}
+
+project.version = '0.1.0'
+
+repositories {
+  mavenCentral()
+}
+
+dependencies {
+  implementation 'org.slf4j:slf4j-api:2.0.13'
+  implementation 'com.google.guava:guava:33.2.0-jre'
+  compileOnly 'jakarta.servlet:jakarta.servlet-api:6.0.0'
+  runtimeOnly 'ch.qos.logback:logback-classic:1.5.6'
+}
+
+compileJava {
+  sourceCompatibility = '17'
+  targetCompatibility = '17'
+}
+
+test {
+  useJUnitPlatform()
+}
+
+def isNonStable = { String version ->
+  // added -JRE for guava
+  def stableKeyword = ['RELEASE', 'FINAL', 'GA', '-JRE'].any { it -> version.toUpperCase().contains(it) }
+  def regex = /^[0-9,.v-]+(-r)?$/
+  return !stableKeyword && !(version ==~ regex)
+}
+
+// https://github.com/ben-manes/gradle-versions-plugin
+tasks.named("dependencyUpdates").configure {
+  rejectVersionIf {
+    isNonStable(it.candidate.version)
+  }
+}
