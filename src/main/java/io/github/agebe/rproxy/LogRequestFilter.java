@@ -15,17 +15,13 @@ package io.github.agebe.rproxy;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Enumeration;
-import java.util.Spliterator;
-import java.util.Spliterators;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.collect.Iterators;
 
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
@@ -55,18 +51,18 @@ public class LogRequestFilter implements Filter {
       log.trace("scheme '{}'", req.getScheme());
       log.trace("servlet path '{}'", req.getServletPath());
       log.trace("isSecure '{}'", req.isSecure());
-      stream(req.getHeaderNames())
+      sorted(req.getHeaderNames())
       .sorted()
       .forEachOrdered(h -> {
-        String values = stream(req.getHeaders(h)).collect(Collectors.joining(", "));
+        String values = sorted(req.getHeaders(h)).collect(Collectors.joining(", "));
         log.trace("header '{}', values '{}'", h, values);
       });
-      stream(req.getAttributeNames())
+      sorted(req.getAttributeNames())
       .sorted()
       .forEachOrdered(attr -> {
         log.trace("attribute '{}', value '{}'", attr, req.getAttribute(attr));
       });
-      stream(req.getParameterNames()).sorted().forEachOrdered(param -> {
+      sorted(req.getParameterNames()).sorted().forEachOrdered(param -> {
         String values = Arrays.stream(req.getParameterValues(param)).collect(Collectors.joining(", "));
         log.trace("parameter '{}', values '{}'", param, values);
       });
@@ -74,10 +70,8 @@ public class LogRequestFilter implements Filter {
     chain.doFilter(request, response);
   }
 
-  // from https://stackoverflow.com/a/33244012
-  private static <T> Stream<T> stream(Enumeration<T> enumeration) {
-    return StreamSupport.stream(Spliterators.spliteratorUnknownSize(
-        Iterators.forEnumeration(enumeration), Spliterator.ORDERED), false);
+  private <T> Stream<T> sorted(Enumeration<T> enumeration) {
+    return Collections.list(enumeration).stream().sorted();
   }
 
 }
