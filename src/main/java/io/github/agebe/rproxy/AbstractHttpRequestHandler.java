@@ -11,19 +11,24 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package agebe;
+package io.github.agebe.rproxy;
 
-import io.github.agebe.rproxy.AbstractHttpRequestHandler;
-import io.github.agebe.rproxy.RequestStatus;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-public class MyHandler extends AbstractHttpRequestHandler {
+public abstract class AbstractHttpRequestHandler implements HttpRequestHandler {
 
-  @Override
-  public RequestStatus handle(HttpServletRequest request, HttpServletResponse response) {
-    return forwardRequestStreamResult("https://docker.gridqube.com", request, response);
-//    return deny(response);
+  public RequestStatus deny(HttpServletResponse response) {
+    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+    return RequestStatus.COMPLETED;
+  }
+
+  public RequestStatus forwardRequestStreamResult(
+      String baseUrl,
+      HttpServletRequest request,
+      HttpServletResponse response) {
+    ReverseProxy.forwardRequestStreamResult(baseUrl, request, response);
+    return RequestStatus.COMPLETED;
   }
 
 }
