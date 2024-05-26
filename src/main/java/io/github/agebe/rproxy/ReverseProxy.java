@@ -51,7 +51,11 @@ public class ReverseProxy {
   public static void forwardRequestStreamResult(
       String remoteBaseUrl,
       HttpServletRequest request,
-      HttpServletResponse response) {
+      HttpServletResponse response,
+      ResponseHeaderModifier headerModifier) {
+    if(headerModifier == null) {
+      headerModifier = ResponseHeaderModifier.identity();
+    }
     byte[] requestBody = getRequestBody(request);
     URL remote = toUrl(remoteBaseUrl);
     try (Socket socket = getSocket(remote)) {
@@ -71,15 +75,16 @@ public class ReverseProxy {
         out.flush();
         try (InputStream in = new BufferedInputStream(socket.getInputStream(), BUF_SIZE)) {
           HeaderParser parser = new HeaderParser(in);
-          HttpHeaders headers = parser.parse();
+          HttpHeadersParseResult parseResult = parser.parse();
+          HttpHeaders headers = parseResult.headers();
           log.debug("http headers '{}'", headers);
           if (log.isTraceEnabled()) {
             log.trace("header bytes\n{}", HexDump
-                .hexdump(headers.bytes())
+                .hexdump(parseResult.bytes())
                 .stream()
                 .collect(Collectors.joining("\n")));
           }
-          setResponseHeaders(response, headers);
+          setResponseHeaders(response, headerModifier.apply(headers));
           Long contentLength = ObjectUtils.asLong(headers.getHeader("Content-Length"));
           if (!hasResponseBody(request, headers)) {
             return;

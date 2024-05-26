@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +38,7 @@ public class HeaderParser {
     this.in = in;
   }
 
-  public HttpHeaders parse() {
+  public HttpHeadersParseResult parse() {
     VersionStatus status = startHeader();
     Map<String, List<String>> headers = new LinkedHashMap<>();
     for(;;) {
@@ -50,11 +51,12 @@ public class HeaderParser {
       List<String> values = headers.computeIfAbsent(name, k -> new ArrayList<>());
       values.add(value);
     }
-    return new HttpHeaders(
-        status.version(),
-        status.statusCode(),
-        status.status(),
-        headers,
+    return new HttpHeadersParseResult(
+        new HttpHeaders(
+            status.version(),
+            status.statusCode(),
+            status.status(),
+            Collections.unmodifiableMap(headers)),
         out.toByteArray());
   }
 

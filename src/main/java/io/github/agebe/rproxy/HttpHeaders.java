@@ -23,8 +23,7 @@ public record HttpHeaders(
     String version,
     int statusCode,
     String status,
-    Map<String, List<String>> headers,
-    byte[] bytes) {
+    Map<String, List<String>> headers) {
 
   public Optional<Map.Entry<String, List<String>>> findHeader(String name) {
     return headers

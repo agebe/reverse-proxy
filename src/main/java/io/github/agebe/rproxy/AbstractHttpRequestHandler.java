@@ -23,11 +23,20 @@ public abstract class AbstractHttpRequestHandler implements HttpRequestHandler {
     return RequestStatus.COMPLETED;
   }
 
-  public RequestStatus forwardRequestStreamResult(
+  public RequestStatus forwardStreamResult(
       String baseUrl,
       HttpServletRequest request,
       HttpServletResponse response) {
-    ReverseProxy.forwardRequestStreamResult(baseUrl, request, response);
+    ReverseProxy.forwardRequestStreamResult(baseUrl, request, response, null);
+    return RequestStatus.COMPLETED;
+  }
+
+  public RequestStatus forwardStreamResult(
+      String baseUrl,
+      HttpServletRequest request,
+      HttpServletResponse response,
+      ResponseHeaderModifier headerModifier) {
+    ReverseProxy.forwardRequestStreamResult(baseUrl, request, response, headerModifier);
     return RequestStatus.COMPLETED;
   }
 
