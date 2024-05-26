@@ -27,7 +27,7 @@ public abstract class AbstractHttpRequestHandler implements HttpRequestHandler {
       String baseUrl,
       HttpServletRequest request,
       HttpServletResponse response) {
-    ReverseProxy.forwardRequestStreamResult(baseUrl, request, response, null);
+    ReverseProxy.forwardRequestStreamResult(baseUrl, request, response, null, null);
     return RequestStatus.COMPLETED;
   }
 
@@ -35,9 +35,17 @@ public abstract class AbstractHttpRequestHandler implements HttpRequestHandler {
       String baseUrl,
       HttpServletRequest request,
       HttpServletResponse response,
+      RequestHeaderModifier requestHeaderModifier,
       ResponseHeaderModifier headerModifier) {
-    ReverseProxy.forwardRequestStreamResult(baseUrl, request, response, headerModifier);
+    ReverseProxy.forwardRequestStreamResult(baseUrl, request, response, requestHeaderModifier, headerModifier);
     return RequestStatus.COMPLETED;
   }
+
+//  public RequestStatus forwardModifyResult(
+//      String baseUrl,
+//      HttpServletRequest request,
+//      Function<byte[], byte[]> contentModifier) {
+//    return RequestStatus.COMPLETED;
+//  }
 
 }

@@ -25,19 +25,42 @@ import org.apache.commons.lang3.StringUtils;
 
 import jakarta.servlet.http.HttpServletRequest;
 
-public class HttpHeaderBuilder {
+public record HttpRequestHeader(
+    String method,
+    String requestURI,
+    String queryString,
+    Map<String, List<String>> headers) {
 
   private static final String CRLF = "\r\n";
 
-  private Map<String, List<String>> headers = new LinkedHashMap<>();
-
-  public HttpHeaderBuilder addHeader(String name, String value) {
+  private static void addHeader(Map<String, List<String>> headers, String name, String value) {
     List<String> values = headers.computeIfAbsent(name, k -> new ArrayList<>());
     values.add(value);
-    return this;
   }
 
-  public byte[] create(String method, String requestURI, String queryString) {
+  public static HttpRequestHeader fromRequest(HttpServletRequest req, String remoteHost) {
+    Map<String, List<String>> headers = new LinkedHashMap<>();
+    Enumeration<String> headerNames = req.getHeaderNames();
+    if(headerNames != null) {
+      while(headerNames.hasMoreElements()) {
+        String name = headerNames.nextElement();
+        Enumeration<String> values = req.getHeaders(name);
+        if(values != null) {
+          while(values.hasMoreElements()) {
+            String v = values.nextElement();
+            if(StringUtils.equalsAnyIgnoreCase(name, "host")) {
+              addHeader(headers, name, remoteHost);
+            } else {
+              addHeader(headers, name, v);
+            }
+          }
+        }
+      }
+    }
+    return new HttpRequestHeader(req.getMethod(), req.getRequestURI(), req.getQueryString(), headers);
+  }
+
+  public byte[] toBytes() {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     try(PrintStream p = new PrintStream(out)) {
       p.printf("%s %s%s HTTP/1.1%s",
@@ -53,30 +76,6 @@ public class HttpHeaderBuilder {
       p.print(CRLF);
     }
     return out.toByteArray();
-  }
-
-  public static byte[] create(
-      HttpServletRequest req,
-      String remoteHost) {
-    HttpHeaderBuilder b = new HttpHeaderBuilder();
-    Enumeration<String> headerNames = req.getHeaderNames();
-    if(headerNames != null) {
-      while(headerNames.hasMoreElements()) {
-        String name = headerNames.nextElement();
-        Enumeration<String> values = req.getHeaders(name);
-        if(values != null) {
-          while(values.hasMoreElements()) {
-            String v = values.nextElement();
-            if(StringUtils.equalsAnyIgnoreCase(name, "host")) {
-              b.addHeader(name, remoteHost);
-            } else {
-              b.addHeader(name, v);
-            }
-          }
-        }
-      }
-    }
-    return b.create(req.getMethod(), req.getRequestURI(), req.getQueryString());
   }
 
 }

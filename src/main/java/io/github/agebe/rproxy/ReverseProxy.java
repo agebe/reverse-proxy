@@ -52,14 +52,16 @@ public class ReverseProxy {
       String remoteBaseUrl,
       HttpServletRequest request,
       HttpServletResponse response,
+      RequestHeaderModifier requestHeaderModifier,
       ResponseHeaderModifier headerModifier) {
     if(headerModifier == null) {
       headerModifier = ResponseHeaderModifier.identity();
     }
+    // FIXME stream the request body
     byte[] requestBody = getRequestBody(request);
     URL remote = toUrl(remoteBaseUrl);
     try (Socket socket = getSocket(remote)) {
-      byte[] requestHeader = HttpHeaderBuilder.create(request, remote.getHost());
+      byte[] requestHeader = RequestHeaderModifier.fromRequest(request, remote.getHost(), requestHeaderModifier).toBytes();
       if (log.isTraceEnabled()) {
         log.trace("request header\n{}", HexDump
             .hexdump(requestHeader)
