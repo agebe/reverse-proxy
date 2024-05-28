@@ -32,19 +32,20 @@ public class MyHandler extends AbstractHttpRequestHandler {
   @Override
   public RequestStatus handle(HttpServletRequest request, HttpServletResponse response) {
 //    return forwardStreamResult("https://docker.gridqube.com", request, response, this::reqHeader, this::respHeader);
-    return forwardModifyResult("https://docker.gridqube.com", request, response, this::reqHeader, this::respHeader, resp -> {
-      Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      Object o = gson.fromJson(new String(resp), Object.class);
-      System.out.println(o);
-      System.out.println(o.getClass().getName());
-      if(o instanceof Map m) {
-        LinkedHashMap lhm = new LinkedHashMap(m);
-        lhm.put("X-Powered-By", "Gateway API-Server");
-        return gson.toJson(lhm).getBytes();
-      } else {
-        return gson.toJson(o).getBytes();
-      }
-    });
+    return forwardStreamResult("http://localhost:3000", request, response, this::reqHeader, this::respHeader);
+//    return forwardModifyResult("https://docker.gridqube.com", request, response, this::reqHeader, this::respHeader, resp -> {
+//      Gson gson = new GsonBuilder().setPrettyPrinting().create();
+//      Object o = gson.fromJson(new String(resp), Object.class);
+//      System.out.println(o);
+//      System.out.println(o.getClass().getName());
+//      if(o instanceof Map m) {
+//        LinkedHashMap lhm = new LinkedHashMap(m);
+//        lhm.put("X-Powered-By", "Gateway API-Server");
+//        return gson.toJson(lhm).getBytes();
+//      } else {
+//        return gson.toJson(o).getBytes();
+//      }
+//    });
 //    return forwardModifyResult("https://docker.gridqube.com", request, this::empty);
 //    return deny(response);
   }
