@@ -53,10 +53,8 @@ public class ReverseProxy {
       HttpServletRequest request,
       HttpServletResponse response,
       RequestHeaderModifier requestHeaderModifier,
-      ResponseHeaderModifier headerModifier) {
-    if(headerModifier == null) {
-      headerModifier = ResponseHeaderModifier.identity();
-    }
+      ResponseHeaderModifier responseHeaderModifier,
+      OutputStream respOut) {
     // FIXME stream the request body
     byte[] requestBody = getRequestBody(request);
     URL remote = toUrl(remoteBaseUrl);
@@ -68,7 +66,6 @@ public class ReverseProxy {
             .stream()
             .collect(Collectors.joining("\n")));
       }
-      OutputStream respOut = response.getOutputStream();
       try (OutputStream out = socket.getOutputStream()) {
         out.write(requestHeader);
         if (requestBody != null) {
@@ -86,7 +83,7 @@ public class ReverseProxy {
                 .stream()
                 .collect(Collectors.joining("\n")));
           }
-          setResponseHeaders(response, headerModifier.apply(headers));
+          setResponseHeaders(response, responseHeaderModifier!=null?responseHeaderModifier.apply(headers):headers);
           Long contentLength = ObjectUtils.asLong(headers.getHeader("Content-Length"));
           if (!hasResponseBody(request, headers)) {
             return;
@@ -131,6 +128,8 @@ public class ReverseProxy {
             }
           }
         }
+      } finally {
+        respOut.flush();
       }
     } catch(Exception e) {
       throw new HttpException(e);

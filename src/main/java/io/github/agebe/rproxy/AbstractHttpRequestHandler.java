@@ -13,6 +13,11 @@
  */
 package io.github.agebe.rproxy;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.function.Function;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -27,8 +32,15 @@ public abstract class AbstractHttpRequestHandler implements HttpRequestHandler {
       String baseUrl,
       HttpServletRequest request,
       HttpServletResponse response) {
-    ReverseProxy.forwardRequestStreamResult(baseUrl, request, response, null, null);
-    return RequestStatus.COMPLETED;
+    return forwardStreamResult(baseUrl, request, response, null, null);
+  }
+
+  private OutputStream getResponseOutputStream(HttpServletResponse response) {
+    try {
+      return response.getOutputStream();
+    } catch(IOException e) {
+      throw new HttpException("failed on get response output stream", e);
+    }
   }
 
   public RequestStatus forwardStreamResult(
@@ -36,16 +48,66 @@ public abstract class AbstractHttpRequestHandler implements HttpRequestHandler {
       HttpServletRequest request,
       HttpServletResponse response,
       RequestHeaderModifier requestHeaderModifier,
-      ResponseHeaderModifier headerModifier) {
-    ReverseProxy.forwardRequestStreamResult(baseUrl, request, response, requestHeaderModifier, headerModifier);
-    return RequestStatus.COMPLETED;
+      ResponseHeaderModifier responseHeaderModifier) {
+    return forwardStreamResult(
+        baseUrl,
+        request,
+        response,
+        requestHeaderModifier,
+        responseHeaderModifier,
+        getResponseOutputStream(response));
   }
 
-//  public RequestStatus forwardModifyResult(
-//      String baseUrl,
-//      HttpServletRequest request,
-//      Function<byte[], byte[]> contentModifier) {
-//    return RequestStatus.COMPLETED;
-//  }
+  public RequestStatus forwardStreamResult(
+      String baseUrl,
+      HttpServletRequest request,
+      HttpServletResponse response,
+      RequestHeaderModifier requestHeaderModifier,
+      ResponseHeaderModifier responseHeaderModifier,
+      OutputStream responseOutputStream) {
+    try {
+      ReverseProxy.forwardRequestStreamResult(
+          baseUrl,
+          request,
+          response,
+          requestHeaderModifier,
+          responseHeaderModifier,
+          responseOutputStream);
+      return RequestStatus.COMPLETED;
+    } catch(Exception e) {
+      throw new HttpException("failed on forward", e);
+    }
+  }
+
+  public RequestStatus forwardModifyResult(
+      String baseUrl,
+      HttpServletRequest request,
+      HttpServletResponse response,
+      RequestHeaderModifier requestHeaderModifier,
+      ResponseHeaderModifier responseHeaderModifier,
+      Function<byte[], byte[]> responseContentModifier) {
+    if(responseContentModifier != null) {
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      forwardStreamResult(
+          baseUrl,
+          request,
+          response,
+          requestHeaderModifier,
+          responseHeaderModifier,
+          out);
+      byte[] modified = responseContentModifier.apply(out.toByteArray());
+      if(modified != null) {
+        response.setHeader("Content-Length", Integer.toString(modified.length));
+        try(OutputStream o = getResponseOutputStream(response)) {
+          o.write(modified);
+        } catch (IOException e) {
+          throw new HttpException("failed on forward", e);
+        }
+      }
+      return RequestStatus.COMPLETED;
+    } else {
+      return forwardStreamResult(baseUrl, request, response, requestHeaderModifier, responseHeaderModifier);
+    }
+  }
 
 }

@@ -17,8 +17,4 @@ import java.util.function.Function;
 
 @FunctionalInterface
 public interface ResponseHeaderModifier extends Function<HttpHeaders, HttpHeaders> {
-
-  static ResponseHeaderModifier identity() {
-    return headers -> headers;
-  }
 }
