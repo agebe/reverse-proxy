@@ -38,7 +38,7 @@ public record HttpRequestHeader(
     values.add(value);
   }
 
-  public static HttpRequestHeader fromRequest(HttpServletRequest req, String remoteHost) {
+  public static HttpRequestHeader fromRequest(HttpServletRequest req, String remoteHost, int remotePort) {
     Map<String, List<String>> headers = new LinkedHashMap<>();
     Enumeration<String> headerNames = req.getHeaderNames();
     if(headerNames != null) {
@@ -49,7 +49,7 @@ public record HttpRequestHeader(
           while(values.hasMoreElements()) {
             String v = values.nextElement();
             if(StringUtils.equalsAnyIgnoreCase(name, "host")) {
-              addHeader(headers, name, remoteHost);
+              addHeader(headers, name, remoteHost+":"+remotePort);
             } else {
               addHeader(headers, name, v);
             }

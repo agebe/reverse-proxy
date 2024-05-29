@@ -57,9 +57,10 @@ public class ReverseProxy {
       OutputStream respOut) {
     // FIXME stream the request body
     byte[] requestBody = getRequestBody(request);
+    log.info("received '{}' bytes", requestBody.length);
     URL remote = toUrl(remoteBaseUrl);
     try (Socket socket = getSocket(remote)) {
-      byte[] requestHeader = RequestHeaderModifier.fromRequest(request, remote.getHost(), requestHeaderModifier).toBytes();
+      byte[] requestHeader = RequestHeaderModifier.fromRequest(request, remote.getHost(), remote.getPort(), requestHeaderModifier).toBytes();
       if (log.isTraceEnabled()) {
         log.trace("request header\n{}", HexDump
             .hexdump(requestHeader)

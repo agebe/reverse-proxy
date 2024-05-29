@@ -23,8 +23,9 @@ public interface RequestHeaderModifier extends Function<HttpRequestHeader, HttpR
   static HttpRequestHeader fromRequest(
       HttpServletRequest request,
       String host,
+      int port,
       RequestHeaderModifier requestHeaderModifier) {
-    HttpRequestHeader requestHeader = HttpRequestHeader.fromRequest(request, host);
+    HttpRequestHeader requestHeader = HttpRequestHeader.fromRequest(request, host, port);
     return requestHeaderModifier!=null?requestHeaderModifier.apply(requestHeader):requestHeader;
   }
 
