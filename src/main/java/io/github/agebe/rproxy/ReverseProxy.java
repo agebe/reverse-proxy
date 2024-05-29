@@ -58,8 +58,16 @@ public class ReverseProxy {
     // FIXME stream the request body
     byte[] requestBody = getRequestBody(request);
     log.info("received '{}' bytes", requestBody.length);
+    if(log.isTraceEnabled()) {
+      byte[] logbuf = new byte[Math.min(1024, requestBody.length)];
+      System.arraycopy(requestBody, 0, logbuf, 0, logbuf.length);
+      log.trace("request body ({}'{}' bytes)\n{}",
+          (requestBody.length == logbuf.length?"":"first "),
+          logbuf.length,
+          HexDump.hexdumpToString(logbuf));
+    }
     URL remote = toUrl(remoteBaseUrl);
-    try (Socket socket = getSocket(remote)) {
+    try(Socket socket = getSocket(remote)) {
       byte[] requestHeader = RequestHeaderModifier.fromRequest(request, remote.getHost(), remote.getPort(), requestHeaderModifier).toBytes();
       if (log.isTraceEnabled()) {
         log.trace("request header\n{}", HexDump
@@ -67,13 +75,13 @@ public class ReverseProxy {
             .stream()
             .collect(Collectors.joining("\n")));
       }
-      try (OutputStream out = socket.getOutputStream()) {
+      try(OutputStream out = socket.getOutputStream()) {
         out.write(requestHeader);
-        if (requestBody != null) {
+        if(requestBody != null) {
           out.write(requestBody);
         }
         out.flush();
-        try (InputStream in = new BufferedInputStream(socket.getInputStream(), BUF_SIZE)) {
+        try(InputStream in = new BufferedInputStream(socket.getInputStream(), BUF_SIZE)) {
           HeaderParser parser = new HeaderParser(in);
           HttpHeadersParseResult parseResult = parser.parse();
           HttpHeaders headers = parseResult.headers();
@@ -87,7 +95,12 @@ public class ReverseProxy {
           setResponseHeaders(response, responseHeaderModifier!=null?responseHeaderModifier.apply(headers):headers);
           Long contentLength = ObjectUtils.asLong(headers.getHeader("Content-Length"));
           if (!hasResponseBody(request, headers)) {
-            return;
+            // from memory this case is important because otherwise the reads below block and the response does
+            // not proceed, so the client is waiting on this reverse proxy, the reverse proxy is waiting on the
+            // downstream server and the downstream server thinks it is done so nothing happens, just waiting for timeouts
+            // FIXME in case we get the 'hasResponseBody' wrong and we are waiting on a non arriving response body below
+            // FIXME make sure there is some sort of timeout in the input stream (probably needs to be configurable too)
+            log.debug("not sending response body, based on method or http response code from downstream server");
           } else if (contentLength != null) {
             log.debug("read content-length '{}' bytes from stream ...", contentLength);
             byte[] buf = new byte[BUF_SIZE];
@@ -150,13 +163,22 @@ public class ReverseProxy {
     try {
       return req.getInputStream().readAllBytes();
     } catch (Exception e) {
-      return null;
+      throw new RuntimeException("failed to read all bytes from request", e);
     }
   }
 
   private static void setResponseHeaders(HttpServletResponse resp, HttpHeaders headers) {
-    log.debug("set response status '{}'", headers.statusCode());
-    resp.setStatus(headers.statusCode());
+    if(headers.statusCode() == 100) {
+      // TODO remove this case
+      log.debug("received status code '100' but sending '200'", headers.statusCode());
+      resp.setStatus(200);
+    } else {
+      // according to https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Expect only curl uses this
+      // this fixes curl file uploaded (no matter the size it seems)
+      // curl -T test.ria http://localhost:8080  -v
+      log.debug("set response status '{}'", headers.statusCode());
+      resp.setStatus(headers.statusCode());
+    }
     headers.headers().forEach((k, l) -> {
       l.forEach(v -> {
         // ignore transfer encoding chunked as we don't control the connection to the
@@ -165,6 +187,10 @@ public class ReverseProxy {
         // (compress, deflate, gzip)
         if (StringUtils.equalsIgnoreCase("Transfer-Encoding", k)) {
           log.debug("ignore header '{}', value '{}'", k, v);
+        } else if(headers.statusCode() == 100 && StringUtils.equalsIgnoreCase("Content-Length", k)) {
+          // TODO remove this case
+          // again curl file upload, in theory the server could send a response here (e.g. see echo server)
+          log.debug("ignore header '{}', value '{}' for status code 100", k, v);
         } else {
           log.debug("set response header '{}', value '{}'", k, v);
           resp.addHeader(k, v);

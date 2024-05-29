@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -30,6 +32,8 @@ public record HttpRequestHeader(
     String requestURI,
     String queryString,
     Map<String, List<String>> headers) {
+
+  private static final Logger log = LoggerFactory.getLogger(HttpRequestHeader.class);
 
   private static final String CRLF = "\r\n";
 
@@ -48,8 +52,12 @@ public record HttpRequestHeader(
         if(values != null) {
           while(values.hasMoreElements()) {
             String v = values.nextElement();
-            if(StringUtils.equalsAnyIgnoreCase(name, "host")) {
+            if(StringUtils.equalsIgnoreCase(name, "host")) {
               addHeader(headers, name, remoteHost+":"+remotePort);
+            } else if(StringUtils.equalsIgnoreCase(name, "expect")) {
+              // ignore the expect header, it seems like tomcat has already dealt with it (between client and this reverse proxy).
+              // no need to send it to the downstream server as it just makes the protocol more complicated for no gain IMHO.
+              log.info("ignoring 'expect' header from client, not sending it to the downstream server, '{}: {}'", name, v);
             } else {
               addHeader(headers, name, v);
             }

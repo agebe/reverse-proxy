@@ -62,10 +62,11 @@ public class LogRequestFilter implements Filter {
       .forEachOrdered(attr -> {
         log.trace("attribute '{}', value '{}'", attr, req.getAttribute(attr));
       });
-      sorted(req.getParameterNames()).sorted().forEachOrdered(param -> {
-        String values = Arrays.stream(req.getParameterValues(param)).collect(Collectors.joining(", "));
-        log.trace("parameter '{}', values '{}'", param, values);
-      });
+      // this seems to consume the request body???
+//      sorted(req.getParameterNames()).sorted().forEachOrdered(param -> {
+//        String values = Arrays.stream(req.getParameterValues(param)).collect(Collectors.joining(", "));
+//        log.trace("parameter '{}', values '{}'", param, values);
+//      });
     }
     chain.doFilter(request, response);
   }
