@@ -81,6 +81,7 @@ public class ReverseProxy {
           out.write(requestBody);
         }
         out.flush();
+        // TODO try to catch and ignore (log debug) broken pipes caused by clients closing the connection
         try(InputStream in = new BufferedInputStream(socket.getInputStream(), BUF_SIZE)) {
           HeaderParser parser = new HeaderParser(in);
           HttpHeadersParseResult parseResult = parser.parse();
@@ -143,7 +144,11 @@ public class ReverseProxy {
           }
         }
       } finally {
-        respOut.flush();
+        try {
+          respOut.flush();
+        } catch(Exception e) {
+          log.debug("failed to flush response", e);
+        }
       }
     } catch(Exception e) {
       throw new HttpException(e);
@@ -168,17 +173,8 @@ public class ReverseProxy {
   }
 
   private static void setResponseHeaders(HttpServletResponse resp, HttpHeaders headers) {
-    if(headers.statusCode() == 100) {
-      // TODO remove this case
-      log.debug("received status code '100' but sending '200'", headers.statusCode());
-      resp.setStatus(200);
-    } else {
-      // according to https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Expect only curl uses this
-      // this fixes curl file uploaded (no matter the size it seems)
-      // curl -T test.ria http://localhost:8080  -v
-      log.debug("set response status '{}'", headers.statusCode());
-      resp.setStatus(headers.statusCode());
-    }
+    log.debug("set response status '{}'", headers.statusCode());
+    resp.setStatus(headers.statusCode());
     headers.headers().forEach((k, l) -> {
       l.forEach(v -> {
         // ignore transfer encoding chunked as we don't control the connection to the
@@ -187,10 +183,6 @@ public class ReverseProxy {
         // (compress, deflate, gzip)
         if (StringUtils.equalsIgnoreCase("Transfer-Encoding", k)) {
           log.debug("ignore header '{}', value '{}'", k, v);
-        } else if(headers.statusCode() == 100 && StringUtils.equalsIgnoreCase("Content-Length", k)) {
-          // TODO remove this case
-          // again curl file upload, in theory the server could send a response here (e.g. see echo server)
-          log.debug("ignore header '{}', value '{}' for status code 100", k, v);
         } else {
           log.debug("set response header '{}', value '{}'", k, v);
           resp.addHeader(k, v);
