@@ -14,7 +14,6 @@
 package io.github.agebe.rproxy;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.stream.Collectors;
@@ -47,7 +46,7 @@ public class LogRequestFilter implements Filter {
       log.trace("path translated '{}'", req.getPathTranslated());
       log.trace("protocol '{}'", req.getProtocol());
       log.trace("query string '{}'", req.getQueryString());
-      log.trace("request URI'{}'", req.getRequestURI());
+      log.trace("request URI '{}'", req.getRequestURI());
       log.trace("scheme '{}'", req.getScheme());
       log.trace("servlet path '{}'", req.getServletPath());
       log.trace("isSecure '{}'", req.isSecure());

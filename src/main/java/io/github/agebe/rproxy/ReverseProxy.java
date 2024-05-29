@@ -20,6 +20,8 @@ import java.net.MalformedURLException;
 import java.net.Socket;
 import java.net.URL;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import javax.net.ssl.SSLContext;
@@ -31,6 +33,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -55,19 +58,12 @@ public class ReverseProxy {
       RequestHeaderModifier requestHeaderModifier,
       ResponseHeaderModifier responseHeaderModifier,
       OutputStream respOut) {
-    // FIXME stream the request body
-    byte[] requestBody = getRequestBody(request);
-    log.info("received '{}' bytes", requestBody.length);
-    if(log.isTraceEnabled()) {
-      byte[] logbuf = new byte[Math.min(1024, requestBody.length)];
-      System.arraycopy(requestBody, 0, logbuf, 0, logbuf.length);
-      log.trace("request body ({}'{}' bytes)\n{}",
-          (requestBody.length == logbuf.length?"":"first "),
-          logbuf.length,
-          HexDump.hexdumpToString(logbuf));
-    }
+    final String requestId = UUID.randomUUID().toString();
     URL remote = toUrl(remoteBaseUrl);
     try(Socket socket = getSocket(remote)) {
+      log.info("forwarding '{} {}' to '{}'", request.getMethod(), request.getRequestURI(), remote);
+      log.debug("execute request id '{}'", requestId);
+      Thread requestBodyWriterThread = null;
       byte[] requestHeader = RequestHeaderModifier.fromRequest(request, remote.getHost(), remote.getPort(), requestHeaderModifier).toBytes();
       if (log.isTraceEnabled()) {
         log.trace("request header\n{}", HexDump
@@ -75,12 +71,34 @@ public class ReverseProxy {
             .stream()
             .collect(Collectors.joining("\n")));
       }
+      AtomicBoolean writerRun = new AtomicBoolean(true);
       try(OutputStream out = socket.getOutputStream()) {
         out.write(requestHeader);
-        if(requestBody != null) {
-          out.write(requestBody);
-        }
-        out.flush();
+        requestBodyWriterThread = new Thread(() -> {
+            try {
+              byte[] buf = new byte[8192];
+              ServletInputStream in = request.getInputStream();
+              long total = 0;
+              while(writerRun.get()) {
+                log.trace("reading request body which might block...");
+                int read = in.read(buf);
+                if(read == -1) {
+                  log.debug("reached end of request body");
+                  out.flush();
+                  break;
+                }
+                total += read;
+                log.trace("received '{}' bytes, total '{}', now writing to output stream which might block...", read, total);
+                out.write(buf, 0, read);
+                log.trace("done writing to output stream, continue");
+              }
+            } catch(Exception e) {
+              log.error("failed to send request body to downstream", e);
+            } finally {
+              log.debug("exit");
+            }
+        }, Thread.currentThread().getName() + "-request-body-writer-" + requestId);
+        requestBodyWriterThread.start();
         // TODO try to catch and ignore (log debug) broken pipes caused by clients closing the connection
         try(InputStream in = new BufferedInputStream(socket.getInputStream(), BUF_SIZE)) {
           HeaderParser parser = new HeaderParser(in);
@@ -127,7 +145,7 @@ public class ReverseProxy {
               }
               if (chunk != null) {
                 respOut.write(chunk);
-                log.debug("written chunked response, length '{}'", chunk.length);
+                log.trace("written chunked response, length '{}'", chunk.length);
               }
             }
             log.debug("transfer encoding chunked, done");
@@ -149,9 +167,19 @@ public class ReverseProxy {
         } catch(Exception e) {
           log.debug("failed to flush response", e);
         }
+        try {
+          writerRun.set(false);
+          if(requestBodyWriterThread != null) {
+            requestBodyWriterThread.interrupt();
+          }
+        } catch(Exception e) {
+          log.debug("failed to stop request body writer", e);
+        }
       }
     } catch(Exception e) {
       throw new HttpException(e);
+    } finally {
+      log.debug("exit request '{}'", requestId);
     }
   }
 
@@ -162,14 +190,6 @@ public class ReverseProxy {
     int sc = headers.statusCode();
     // https://stackoverflow.com/questions/8628725/comprehensive-list-of-http-status-codes-that-dont-include-a-response-body
     return (sc >= 200) && (sc != 204) && (sc != 304);
-  }
-
-  private static byte[] getRequestBody(HttpServletRequest req) {
-    try {
-      return req.getInputStream().readAllBytes();
-    } catch (Exception e) {
-      throw new RuntimeException("failed to read all bytes from request", e);
-    }
   }
 
   private static void setResponseHeaders(HttpServletResponse resp, HttpHeaders headers) {
@@ -211,7 +231,7 @@ public class ReverseProxy {
     String chunkSizeString = new String(chunkSizeBytes);
     try {
       int chunkSize = Integer.parseInt(chunkSizeString, 16);
-      log.debug("next chunk size hex '{}', '{}' bytes", chunkSizeString, chunkSize);
+      log.trace("next chunk size hex '{}', '{}' bytes", chunkSizeString, chunkSize);
       return chunkSize;
     } catch (Exception e) {
       throw new HttpException("failed to convert hex chunk size '{}' to decimal", chunkSizeString);

@@ -35,14 +35,18 @@ public class EchoServer {
       InputStream in = he.getRequestBody();
       long total = 0;
       try(OutputStream out = he.getResponseBody()) {
-        byte[] buf = new byte[8192];
+        byte[] buf = new byte[64*1024];
         for(;;) {
+          System.out.println("reading, which might block...");
           int read = in.read(buf);
           if(read == -1) {
             break;
           }
           total+=read;
+          System.out.println("receiving..., received '%s', total '%s'".formatted(read, total));
+          System.out.println("writing, which might block...");
           out.write(buf, 0, read);
+          System.out.println("echo..., written back to output stream".formatted(read, total));
         }
         if(total == 0) {
           out.write("request received".getBytes());
