@@ -23,10 +23,15 @@ import com.google.gson.GsonBuilder;
 import io.github.agebe.rproxy.AbstractHttpRequestHandler;
 import io.github.agebe.rproxy.HttpHeaders;
 import io.github.agebe.rproxy.HttpRequestHeader;
+import io.github.agebe.rproxy.MatchType;
+import io.github.agebe.rproxy.ProxyPath;
 import io.github.agebe.rproxy.RequestStatus;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+@ProxyPath("test/*")
+@ProxyPath(value = "test2/*", type = MatchType.GLOB)
+@ProxyPath(value = "regex[0-9]/.*", type = MatchType.REGEX)
 public class MyHandler extends AbstractHttpRequestHandler {
 
   @Override
