@@ -1,0 +1,6 @@
+dependencies {
+  implementation project(':rproxy-core')
+  implementation 'org.slf4j:slf4j-api:2.0.13'
+  implementation 'org.reflections:reflections:0.10.2'
+  compileOnly 'jakarta.servlet:jakarta.servlet-api:6.0.0'
+}

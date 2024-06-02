@@ -1,3 +1,4 @@
 rootProject.name = 'reverse-proxy'
 include 'rproxy-core'
 include 'rproxy-filter-initializer'
+include 'rproxy-resource-initializer'
