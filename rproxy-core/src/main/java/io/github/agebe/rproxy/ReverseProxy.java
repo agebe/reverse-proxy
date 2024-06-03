@@ -124,8 +124,18 @@ public class ReverseProxy {
             log.debug("read content-length '{}' bytes from stream ...", contentLength);
             byte[] buf = new byte[BUF_SIZE];
             long cl = contentLength;
+            long total = 0;
             for (;;) {
               int read = in.read(buf, 0, (int) Math.min(BUF_SIZE, cl));
+              if(read < 0) {
+                log.warn("reached end of stream before reading length announced in content-length header,"
+                    + " read '{}', content-length '{}'", total, contentLength);
+                if(!response.isCommitted()) {
+                  response.setContentLength((int)total);
+                }
+                break;
+              }
+              total +=read;
               respOut.write(buf, 0, read);
               cl -= read;
               log.trace("written '{}' bytes, '{}' bytes to go", read, cl);
@@ -150,6 +160,9 @@ public class ReverseProxy {
             }
             log.debug("transfer encoding chunked, done");
           } else {
+            // not so sure about this case
+            // if the server does not set a content-length nor transfer-encoding chunked header,
+            // there might not be a response body and we could end up waiting forever here.
             byte[] buf = new byte[BUF_SIZE];
             for (;;) {
               int read = in.read(buf);
@@ -189,6 +202,8 @@ public class ReverseProxy {
     }
     int sc = headers.statusCode();
     // https://stackoverflow.com/questions/8628725/comprehensive-list-of-http-status-codes-that-dont-include-a-response-body
+    // according to this a 302 can have a body but usually doesn't:
+    // https://stackoverflow.com/a/8059718
     return (sc >= 200) && (sc != 204) && (sc != 304);
   }
 

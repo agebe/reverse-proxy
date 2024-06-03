@@ -26,6 +26,20 @@ public class EchoServer {
 
   private HttpServer server;
 
+  private class RedirectHandler implements HttpHandler {
+
+    @Override
+    public void handle(HttpExchange he) throws IOException {
+      System.out.println("redirect, handle request '%s' '%s'".formatted(he.getRequestMethod(), he.getRequestURI()));
+      String body = "redirected";
+      he.getResponseHeaders().add("Location", "/test");
+      he.sendResponseHeaders(302, body.getBytes().length);
+      he.sendResponseHeaders(302, -1);
+      he.getResponseBody().write(body.getBytes());
+      he.getResponseBody().close();
+    }
+  }
+
   private class EchoHandler implements HttpHandler {
 
     @Override
@@ -58,6 +72,7 @@ public class EchoServer {
 
   private void run(String[] args) throws Exception {
     server = HttpServer.create(new InetSocketAddress("127.0.0.1", 3000), 0);
+    server.createContext("/redirect", new RedirectHandler());
     server.createContext("/", new EchoHandler());
     server.setExecutor(null); // creates a default executor
     server.start();
