@@ -163,15 +163,15 @@ public class ReverseProxy {
             // not so sure about this case
             // if the server does not set a content-length nor transfer-encoding chunked header,
             // there might not be a response body and we could end up waiting forever here.
-            byte[] buf = new byte[BUF_SIZE];
-            for (;;) {
-              int read = in.read(buf);
-              if (read == -1) {
-                respOut.flush();
-                break;
-              }
-              respOut.write(buf, 0, read);
-            }
+//            byte[] buf = new byte[BUF_SIZE];
+//            for (;;) {
+//              int read = in.read(buf);
+//              if (read == -1) {
+//                respOut.flush();
+//                break;
+//              }
+//              respOut.write(buf, 0, read);
+//            }
           }
         }
       } finally {
