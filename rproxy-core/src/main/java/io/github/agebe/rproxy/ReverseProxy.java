@@ -195,10 +195,15 @@ public class ReverseProxy {
       try {
         response.sendError(HttpServletResponse.SC_BAD_GATEWAY);
       } catch(IOException ioException) {
-        log.warn("failed to send bad gateway http error to client", ioException);
+        log.warn("failed to send bad gateway http status to client", ioException);
       }
     } catch(Exception e) {
-      throw new ReverseProxyException(e);
+      log.error("failed processing request", e);
+      try {
+        response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+      } catch(IOException ioException) {
+        log.warn("failed to send server error http status to client", ioException);
+      }
     } finally {
       log.debug("exit request '{}'", requestId);
     }

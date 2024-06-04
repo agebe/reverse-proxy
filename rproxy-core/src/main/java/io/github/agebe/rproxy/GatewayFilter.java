@@ -37,26 +37,31 @@ public class GatewayFilter implements Filter {
       throws IOException, ServletException {
     HttpServletRequest req = (HttpServletRequest)request;
     HttpServletResponse resp = (HttpServletResponse)response;
-    // only 1 handler instance per class and request
-    // this is just in case you have multiple overlapping matchers on a single handler
-    // not sure if this is required
-    Map<Class<? extends HttpRequestHandler>, HttpRequestHandler> cache = new HashMap<>();
-    for(Handler handler : HandlerRegister.instance().getHandlers(req)) {
-      HttpRequestHandler h = cache.computeIfAbsent(handler.handlerCls(),
-          k -> InjectorSupport.getInjector().getInstance(k));
-      log.debug("request '%s' matched '%s', executing handler '%s' ...",
-          req.getRequestURI(),
-          handler.matcher(),
-          handler.handlerCls().getName());
-      RequestStatus rs = h.handle(req, resp);
-      if(RequestStatus.COMPLETED.equals(rs)) {
-        return;
-      } else if(RequestStatus.CONTINUE.equals(rs)) {
-        continue;
-      } else {
-        // TODO log exception, return http error code (e.g. 502)
-        throw new ReverseProxyException("unknown status '{}'", rs);
+    try {
+      // only 1 handler instance per class and request
+      // this is just in case you have multiple overlapping matchers on a single handler
+      // not sure if this is required
+      Map<Class<? extends HttpRequestHandler>, HttpRequestHandler> cache = new HashMap<>();
+      for(Handler handler : HandlerRegister.instance().getHandlers(req)) {
+        HttpRequestHandler h = cache.computeIfAbsent(handler.handlerCls(),
+            k -> InjectorSupport.getInjector().getInstance(k));
+        log.debug("request '%s' matched '%s', executing handler '%s' ...",
+            req.getRequestURI(),
+            handler.matcher(),
+            handler.handlerCls().getName());
+        RequestStatus rs = h.handle(req, resp);
+        if(RequestStatus.COMPLETED.equals(rs)) {
+          return;
+        } else if(RequestStatus.CONTINUE.equals(rs)) {
+          continue;
+        } else {
+          log.error("unknown status '{}'", rs);
+          resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        }
       }
+    } catch(Exception e) {
+      log.error("failed to process request", e);
+      resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
     }
     // if no handler has taken care of this request continue with the filter chain
     chain.doFilter(request, response);
