@@ -21,7 +21,7 @@ public class InjectorSupport {
       try {
         return cls.getConstructor().newInstance();
       } catch(Exception e) {
-        throw new HttpException("failed to get instance of class '{}'", cls.getName());
+        throw new ReverseProxyException("failed to get instance of class '{}'", cls.getName());
       }
     }
   };

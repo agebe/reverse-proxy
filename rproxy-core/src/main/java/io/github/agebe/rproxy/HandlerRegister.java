@@ -43,10 +43,10 @@ public class HandlerRegister {
 
   public void addHandler(Class<? extends HttpRequestHandler> handlerCls) {
     if(handlerCls.isInterface()) {
-      throw new HttpException("can not register handler interface '%s'".formatted(handlerCls.getName()));
+      throw new ReverseProxyException("can not register handler interface '%s'".formatted(handlerCls.getName()));
     }
     if(Modifier.isAbstract(handlerCls.getModifiers())) {
-      throw new HttpException("can not register abstract handler class '%s'".formatted(handlerCls.getName()));
+      throw new ReverseProxyException("can not register abstract handler class '%s'".formatted(handlerCls.getName()));
     }
     handlers.addAll(Stream.of(handlerCls)
         .flatMap(this::allPaths)
@@ -79,7 +79,7 @@ public class HandlerRegister {
     } else if(MatchType.REGEX.equals(type)) {
       return Pattern.compile(pathWithLeadingSlash(path.value())).asPredicate();
     } else {
-      throw new HttpException("match type '%s' not implemented".formatted(type));
+      throw new ReverseProxyException("match type '%s' not implemented".formatted(type));
     }
   }
 

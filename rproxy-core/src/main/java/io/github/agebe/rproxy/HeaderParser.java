@@ -80,11 +80,11 @@ public class HeaderParser {
     String line = nextLine();
     String[] parts = StringUtils.split(line);
     if(parts.length < 2) {
-      throw new HttpException("expected http start header with 2 parts but got '{}'", line);
+      throw new ReverseProxyException("expected http start header with 2 parts but got '{}'", line);
     }
     Integer code = asInteger(parts[1]);
     if(code == null) {
-      throw new HttpException("failed to parse http status code from '{}'", line);
+      throw new ReverseProxyException("failed to parse http status code from '{}'", line);
     }
     String status = (parts.length>=3)?parts[2]:null;
     return new VersionStatus(parts[0], code, status);
@@ -103,14 +103,14 @@ public class HeaderParser {
           if(i2 == 0xa) {
             return s.isEmpty()?null:s.toString();
           } else {
-            throw new HttpException("failed to parse http headers,"
+            throw new ReverseProxyException("failed to parse http headers,"
                 + " expected line feed after carriage return but got '{}'", Integer.toHexString(i2));
           }
         } else {
           // TODO check allowed http header character
           s.append((char)i);
           if(s.length() > MAX_HEADER_SIZE) {
-            throw new HttpException("http header is to large (> '{}'", MAX_HEADER_SIZE);
+            throw new ReverseProxyException("http header is to large (> '{}'", MAX_HEADER_SIZE);
           }
         }
       }
@@ -122,7 +122,7 @@ public class HeaderParser {
   private int nextByte() throws IOException {
     int i = in.read();
     if(i == -1) {
-      throw new HttpException("unexpected end of stream while parsing http headers");
+      throw new ReverseProxyException("unexpected end of stream while parsing http headers");
     }
     out.write(i);
     return i;

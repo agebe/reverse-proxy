@@ -55,7 +55,7 @@ public class GatewayFilter implements Filter {
         continue;
       } else {
         // TODO log exception, return http error code (e.g. 502)
-        throw new HttpException("unknown status '{}'", rs);
+        throw new ReverseProxyException("unknown status '{}'", rs);
       }
     }
     // if no handler has taken care of this request continue with the filter chain

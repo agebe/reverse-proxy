@@ -14,6 +14,7 @@
 package io.github.agebe.rproxy;
 
 import java.io.BufferedInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
@@ -47,7 +48,7 @@ public class ReverseProxy {
     try {
       return new URL(url);
     } catch (MalformedURLException e) {
-      throw new HttpException(e);
+      throw new ReverseProxyException(e);
     }
   }
 
@@ -189,8 +190,15 @@ public class ReverseProxy {
           log.debug("failed to stop request body writer", e);
         }
       }
+    } catch(BadGatewayException e) {
+      log.error("failed to open socket, sending bad gateway to client ...", e);
+      try {
+        response.sendError(HttpServletResponse.SC_BAD_GATEWAY);
+      } catch(IOException ioException) {
+        log.warn("failed to send bad gateway http error to client", ioException);
+      }
     } catch(Exception e) {
-      throw new HttpException(e);
+      throw new ReverseProxyException(e);
     } finally {
       log.debug("exit request '{}'", requestId);
     }
@@ -241,7 +249,7 @@ public class ReverseProxy {
   private static int getChunkSize(InputStream in) {
     byte[] chunkSizeBytes = HttpUtils.nextChunkSize(in);
     if ((chunkSizeBytes == null) || chunkSizeBytes.length == 0) {
-      throw new HttpException("failed to read next chunk size from stream");
+      throw new ReverseProxyException("failed to read next chunk size from stream");
     }
     String chunkSizeString = new String(chunkSizeBytes);
     try {
@@ -249,7 +257,7 @@ public class ReverseProxy {
       log.trace("next chunk size hex '{}', '{}' bytes", chunkSizeString, chunkSize);
       return chunkSize;
     } catch (Exception e) {
-      throw new HttpException("failed to convert hex chunk size '{}' to decimal", chunkSizeString);
+      throw new ReverseProxyException("failed to convert hex chunk size '{}' to decimal", chunkSizeString);
     }
   }
 
@@ -273,10 +281,10 @@ public class ReverseProxy {
         Socket s = new Socket(host, (port == -1 ? 80 : port));
         return s;
       } else {
-        throw new HttpException("failed to open socket, protocol in '{}' not supported", remote);
+        throw new BadGatewayException("failed to open socket, protocol in '{}' not supported", remote);
       }
     } catch (Exception e) {
-      throw new HttpException("failed to open socket to '{}'", remote, e);
+      throw new BadGatewayException("failed to open socket to '{}'", remote, e);
     }
   }
 

@@ -45,7 +45,7 @@ public record HttpHeaders(
       } else if(l.size() == 1) {
         return l.get(0);
       } else {
-        throw new HttpException("header '{}' is a multi value header ('{}')", name, l.size());
+        throw new ReverseProxyException("header '{}' is a multi value header ('{}')", name, l.size());
       }
     } else {
       return null;

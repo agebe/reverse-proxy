@@ -39,7 +39,7 @@ public abstract class AbstractHttpRequestHandler implements HttpRequestHandler {
     try {
       return response.getOutputStream();
     } catch(IOException e) {
-      throw new HttpException("failed on get response output stream", e);
+      throw new ReverseProxyException("failed on get response output stream", e);
     }
   }
 
@@ -75,7 +75,7 @@ public abstract class AbstractHttpRequestHandler implements HttpRequestHandler {
           responseOutputStream);
       return RequestStatus.COMPLETED;
     } catch(Exception e) {
-      throw new HttpException("failed on forward", e);
+      throw new ReverseProxyException("failed on forward", e);
     }
   }
 
@@ -101,7 +101,7 @@ public abstract class AbstractHttpRequestHandler implements HttpRequestHandler {
         try(OutputStream o = getResponseOutputStream(response)) {
           o.write(modified);
         } catch (IOException e) {
-          throw new HttpException("failed on forward", e);
+          throw new ReverseProxyException("failed on forward", e);
         }
       }
       return RequestStatus.COMPLETED;

@@ -13,30 +13,27 @@
  */
 package io.github.agebe.rproxy;
 
-import org.slf4j.helpers.MessageFormatter;
+public class BadGatewayException extends ReverseProxyException {
 
-public class HttpException extends RuntimeException {
+  private static final long serialVersionUID = -3953959909303300898L;
 
-  private static final long serialVersionUID = 2521664048929495204L;
-
-  public HttpException() {
+  public BadGatewayException() {
     super();
   }
 
-  public HttpException(String messagePattern, Object... args) {
-    super(MessageFormatter.arrayFormat(messagePattern, args).getMessage(),
-        (args[args.length-1] instanceof Throwable)?(Throwable)args[args.length-1]:null);
+  public BadGatewayException(String messagePattern, Object... args) {
+    super(messagePattern, args);
   }
 
-  public HttpException(String message, Throwable cause) {
+  public BadGatewayException(String message, Throwable cause) {
     super(message, cause);
   }
 
-  public HttpException(String message) {
+  public BadGatewayException(String message) {
     super(message);
   }
 
-  public HttpException(Throwable cause) {
+  public BadGatewayException(Throwable cause) {
     super(cause);
   }
 
