@@ -60,7 +60,7 @@ public class HandlerRegister {
     ProxyPath[] paths = handlerCls.getAnnotationsByType(ProxyPath.class);
     if(paths.length == 0) {
       // if the handler does not have a proxy path annotation is will handle all incoming calls
-      return Stream.of(new Handler(MatchType.ALL.createMatcher("*"), handlerCls));
+      return Stream.of(new Handler(MatchType.ALL.createMatcher(null), handlerCls));
     } else {
       return Arrays.stream(paths)
           .map(path -> new Handler(createMatcher(path), handlerCls));

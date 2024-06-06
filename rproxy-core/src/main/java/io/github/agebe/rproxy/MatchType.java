@@ -90,7 +90,7 @@ public enum MatchType {
   private static class AllMatcher extends AbstractMatcher {
 
     public AllMatcher(String pattern) {
-      super(pattern);
+      super("*");
     }
 
     @Override
