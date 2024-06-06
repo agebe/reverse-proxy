@@ -18,14 +18,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Predicate;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.hrakaroo.glob.GlobPattern;
-import com.hrakaroo.glob.MatchingEngine;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -64,7 +60,7 @@ public class HandlerRegister {
     ProxyPath[] paths = handlerCls.getAnnotationsByType(ProxyPath.class);
     if(paths.length == 0) {
       // if the handler does not have a proxy path annotation is will handle all incoming calls
-      return Stream.of(new Handler(s -> true, handlerCls));
+      return Stream.of(new Handler(MatchType.ALL.createMatcher("*"), handlerCls));
     } else {
       return Arrays.stream(paths)
           .map(path -> new Handler(createMatcher(path), handlerCls));
@@ -72,15 +68,7 @@ public class HandlerRegister {
   }
 
   private Predicate<String> createMatcher(ProxyPath path) {
-    MatchType type = path.type();
-    if(MatchType.GLOB.equals(type)) {
-      MatchingEngine matcher = GlobPattern.compile(pathWithLeadingSlash(path.value()));
-      return s -> matcher.matches(s);
-    } else if(MatchType.REGEX.equals(type)) {
-      return Pattern.compile(pathWithLeadingSlash(path.value())).asPredicate();
-    } else {
-      throw new ReverseProxyException("match type '%s' not implemented".formatted(type));
-    }
+    return path.type().createMatcher(pathWithLeadingSlash(path.value()));
   }
 
   private String pathWithLeadingSlash(String path) {
