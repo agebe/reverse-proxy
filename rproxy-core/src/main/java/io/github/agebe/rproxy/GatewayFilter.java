@@ -45,7 +45,7 @@ public class GatewayFilter implements Filter {
       for(Handler handler : HandlerRegister.instance().getHandlers(req)) {
         HttpRequestHandler h = cache.computeIfAbsent(handler.handlerCls(),
             k -> InjectorSupport.getInjector().getInstance(k));
-        log.debug("request '%s' matched '%s', executing handler '%s' ...",
+        log.debug("request '{}' matched '{}', executing handler '{}' ...",
             req.getRequestURI(),
             handler.matcher(),
             handler.handlerCls().getName());
