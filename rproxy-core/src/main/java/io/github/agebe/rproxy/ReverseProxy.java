@@ -73,16 +73,16 @@ public class ReverseProxy {
             .collect(Collectors.joining("\n")));
       }
       AtomicBoolean writerRun = new AtomicBoolean(true);
+      final ServletInputStream requestBodyInputStream = request.getInputStream();
       try(OutputStream out = socket.getOutputStream()) {
         out.write(requestHeader);
         requestBodyWriterThread = new Thread(() -> {
             try {
               byte[] buf = new byte[8192];
-              ServletInputStream in = request.getInputStream();
               long total = 0;
               while(writerRun.get()) {
                 log.trace("reading request body which might block...");
-                int read = in.read(buf);
+                int read = requestBodyInputStream.read(buf);
                 if(read == -1) {
                   log.debug("reached end of request body");
                   out.flush();
