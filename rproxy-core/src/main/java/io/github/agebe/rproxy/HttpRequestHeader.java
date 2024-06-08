@@ -53,7 +53,8 @@ public record HttpRequestHeader(
           while(values.hasMoreElements()) {
             String v = values.nextElement();
             if(StringUtils.equalsIgnoreCase(name, "host")) {
-              addHeader(headers, name, remoteHost+":"+remotePort);
+              String hostAndPort = remotePort!=-1?remoteHost+":"+remotePort:remoteHost;
+              addHeader(headers, name, hostAndPort);
             } else if(StringUtils.equalsIgnoreCase(name, "expect")) {
               // ignore the expect header, it seems like tomcat has already dealt with it (between client and this reverse proxy).
               // no need to send it to the downstream server as it just makes the protocol more complicated for no gain IMHO.
