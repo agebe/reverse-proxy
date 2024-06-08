@@ -65,33 +65,50 @@ public class ReverseProxy {
       log.info("forwarding '{} {}' to '{}'", request.getMethod(), request.getRequestURI(), remote);
       log.debug("execute request id '{}'", requestId);
       Thread requestBodyWriterThread = null;
-      byte[] requestHeader = RequestHeaderModifier.fromRequest(request, remote.getHost(), remote.getPort(), requestHeaderModifier).toBytes();
+      HttpRequestHeader requestHeader = RequestHeaderModifier.fromRequest(request, remote.getHost(), remote.getPort(), requestHeaderModifier);
+      byte[] requestHeaderBytes = requestHeader.toBytes();
       if (log.isTraceEnabled()) {
-        log.trace("request header\n{}", HexDump
-            .hexdump(requestHeader)
+        log.trace("sending request headers to server ... \n{}", HexDump
+            .hexdump(requestHeaderBytes)
             .stream()
             .collect(Collectors.joining("\n")));
       }
       AtomicBoolean writerRun = new AtomicBoolean(true);
       final ServletInputStream requestBodyInputStream = request.getInputStream();
+      final boolean chunkedUpload = requestHeader.isTransferEncodingChunked();
       try(OutputStream out = socket.getOutputStream()) {
-        out.write(requestHeader);
+        out.write(requestHeaderBytes);
         requestBodyWriterThread = new Thread(() -> {
             try {
               byte[] buf = new byte[8192];
               long total = 0;
               while(writerRun.get()) {
-                log.trace("reading request body which might block...");
+                log.trace("reading request body ...");
                 int read = requestBodyInputStream.read(buf);
                 if(read == -1) {
                   log.debug("reached end of request body");
                   out.flush();
                   break;
+                } else if(read > 0) {
+                  total += read;
+                  log.trace("received '{}' bytes, total '{}', now writing to output stream ...", read, total);
+                  if(chunkedUpload) {
+                    // test chunked upload with curl and EchoServer
+                    // curl -H "Transfer-Encoding: chunked" --data-binary @my-file.bin http://localhost:8080/test/1 --output response-file.bin
+                    out.write((Integer.toString(read,16) + HttpRequestHeader.CRLF).getBytes());
+                    out.write(buf, 0, read);
+                    out.write(HttpRequestHeader.CRLF.getBytes());
+                    log.trace("written chunked request body bytes '{}' to server", read);
+                  } else {
+                    out.write(buf, 0, read);
+                    log.trace("written request body bytes '{}' to server", read);
+                  }
+                  log.trace("done writing to output stream, continue");
                 }
-                total += read;
-                log.trace("received '{}' bytes, total '{}', now writing to output stream which might block...", read, total);
-                out.write(buf, 0, read);
-                log.trace("done writing to output stream, continue");
+              }
+              if(chunkedUpload) {
+                // write last chunk, https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding
+                out.write(("0"+HttpRequestHeader.CRLF+HttpRequestHeader.CRLF).getBytes());
               }
             } catch(Exception e) {
               log.error("failed to send request body to downstream", e);
@@ -105,9 +122,9 @@ public class ReverseProxy {
           HeaderParser parser = new HeaderParser(in);
           HttpHeadersParseResult parseResult = parser.parse();
           HttpHeaders headers = parseResult.headers();
-          log.debug("http headers '{}'", headers);
+          log.debug("received http headers from server '{}'", headers);
           if (log.isTraceEnabled()) {
-            log.trace("header bytes\n{}", HexDump
+            log.trace("received http headers from server bytes\n{}", HexDump
                 .hexdump(parseResult.bytes())
                 .stream()
                 .collect(Collectors.joining("\n")));
@@ -135,28 +152,29 @@ public class ReverseProxy {
                   response.setContentLength((int)total);
                 }
                 break;
-              }
-              total +=read;
-              respOut.write(buf, 0, read);
-              cl -= read;
-              log.trace("written '{}' bytes, '{}' bytes to go", read, cl);
-              if (cl <= 0) {
-                log.trace("reached content-length of '{}' bytes, break", contentLength);
-                break;
+              } else if(read > 0) {
+                total +=read;
+                respOut.write(buf, 0, read);
+                cl -= read;
+                log.trace("written '{}' bytes to client, '{}' bytes to go", read, cl);
+                if (cl <= 0) {
+                  log.trace("reached content-length of '{}' bytes, break", contentLength);
+                  break;
+                }
               }
             }
           } else if (isTransferEncodingChunked(headers)) {
             log.debug("transfer encoding chunked");
             // do not write the http chunked protocol, let tomcat figure this out
-            for (;;) {
+            for(;;) {
               int chunkSize = getChunkSize(in);
               byte[] chunk = HttpUtils.nextChunk(in, chunkSize);
-              if (chunkSize == 0) {
+              if(chunkSize == 0) {
                 break;
               }
-              if (chunk != null) {
+              if(chunk != null) {
                 respOut.write(chunk);
-                log.trace("written chunked response, length '{}'", chunk.length);
+                log.trace("written chunked response to client, length '{}'", chunk.length);
               }
             }
             log.debug("transfer encoding chunked, done");

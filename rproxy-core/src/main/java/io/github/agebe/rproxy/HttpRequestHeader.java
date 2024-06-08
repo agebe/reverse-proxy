@@ -20,6 +20,7 @@ import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -35,7 +36,7 @@ public record HttpRequestHeader(
 
   private static final Logger log = LoggerFactory.getLogger(HttpRequestHeader.class);
 
-  private static final String CRLF = "\r\n";
+  public static final String CRLF = "\r\n";
 
   private static void addHeader(Map<String, List<String>> headers, String name, String value) {
     List<String> values = headers.computeIfAbsent(name, k -> new ArrayList<>());
@@ -85,6 +86,20 @@ public record HttpRequestHeader(
       p.print(CRLF);
     }
     return out.toByteArray();
+  }
+
+  public boolean isTransferEncodingChunked() {
+    if(headers == null) {
+      return false;
+    }
+    return headers.entrySet()
+        .stream()
+        .filter(me -> StringUtils.equalsIgnoreCase(me.getKey(), "transfer-encoding"))
+        .flatMap(me -> (me.getValue()!=null?me.getValue().stream():Stream.empty()))
+        .filter(s -> StringUtils.equalsIgnoreCase("chunked", s))
+        .findFirst()
+        .map(s -> true)
+        .orElse(false);
   }
 
 }
