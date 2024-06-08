@@ -138,7 +138,7 @@ public class ReverseProxy {
             // FIXME in case we get the 'hasResponseBody' wrong and we are waiting on a non arriving response body below
             // FIXME make sure there is some sort of timeout in the input stream (probably needs to be configurable too)
             log.debug("not sending response body, based on method or http response code from downstream server");
-          } else if (contentLength != null) {
+          } else if ((contentLength != null) && (contentLength > 0)) {
             log.debug("read content-length '{}' bytes from stream ...", contentLength);
             byte[] buf = new byte[BUF_SIZE];
             long cl = contentLength;
