@@ -20,7 +20,10 @@ import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.Socket;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -52,6 +55,33 @@ public class ReverseProxy {
     }
   }
 
+  private static HttpHeaders addViaHeader(HttpHeaders headers, HttpServletRequest req) {
+    List<String> via = headers.getHeaders("via");
+    List<String> newVia = new ArrayList<>();
+    if(via != null) {
+      newVia.addAll(via);
+    }
+    newVia.add("HTTP/1.1 %s:%s".formatted(req.getLocalAddr(), req.getLocalPort()));
+    Map<String, List<String>> m = new LinkedHashMap<>(headers.headers());
+    m.put("Via", newVia);
+    return new HttpHeaders(
+        headers.version(),
+        headers.statusCode(),
+        headers.status(),
+        m);
+  }
+
+  private static HttpHeaders applyReponseHeaderModifiers(
+      ResponseHeaderModifier responseHeaderModifier,
+      HttpHeaders headers,
+      HttpServletRequest req) {
+    HttpHeaders result = addViaHeader(headers, req);
+    if(responseHeaderModifier != null) {
+      result = responseHeaderModifier.apply(result);
+    }
+    return result;
+  }
+
   public static void forwardRequestStreamResult(
       String remoteBaseUrl,
       HttpServletRequest request,
@@ -65,7 +95,11 @@ public class ReverseProxy {
       log.info("forwarding '{} {}' to '{}'", request.getMethod(), request.getRequestURI(), remote);
       log.debug("execute request id '{}'", requestId);
       Thread requestBodyWriterThread = null;
-      HttpRequestHeader requestHeader = RequestHeaderModifier.fromRequest(request, remote.getHost(), remote.getPort(), requestHeaderModifier);
+      HttpRequestHeader requestHeader = RequestHeaderModifier.fromRequest(
+          request,
+          remote.getHost(),
+          remote.getPort(),
+          requestHeaderModifier);
       byte[] requestHeaderBytes = requestHeader.toBytes();
       if (log.isTraceEnabled()) {
         log.trace("sending request headers to server ... \n{}", HexDump
@@ -123,13 +157,13 @@ public class ReverseProxy {
           HttpHeadersParseResult parseResult = parser.parse();
           HttpHeaders headers = parseResult.headers();
           log.debug("received http headers from server '{}'", headers);
-          if (log.isTraceEnabled()) {
+          if(log.isTraceEnabled()) {
             log.trace("received http headers from server bytes\n{}", HexDump
                 .hexdump(parseResult.bytes())
                 .stream()
                 .collect(Collectors.joining("\n")));
           }
-          setResponseHeaders(response, responseHeaderModifier!=null?responseHeaderModifier.apply(headers):headers);
+          setResponseHeaders(response, applyReponseHeaderModifiers(responseHeaderModifier, headers, request));
           Long contentLength = ObjectUtils.asLong(headers.getHeader("Content-Length"));
           if (!hasResponseBody(request, headers)) {
             // from memory this case is important because otherwise the reads below block and the response does
@@ -138,12 +172,12 @@ public class ReverseProxy {
             // FIXME in case we get the 'hasResponseBody' wrong and we are waiting on a non arriving response body below
             // FIXME make sure there is some sort of timeout in the input stream (probably needs to be configurable too)
             log.debug("not sending response body, based on method or http response code from downstream server");
-          } else if ((contentLength != null) && (contentLength > 0)) {
+          } else if((contentLength != null) && (contentLength > 0)) {
             log.debug("read content-length '{}' bytes from stream ...", contentLength);
             byte[] buf = new byte[BUF_SIZE];
             long cl = contentLength;
             long total = 0;
-            for (;;) {
+            for(;;) {
               int read = in.read(buf, 0, (int) Math.min(BUF_SIZE, cl));
               if(read < 0) {
                 log.warn("reached end of stream before reading length announced in content-length header,"
@@ -163,7 +197,7 @@ public class ReverseProxy {
                 }
               }
             }
-          } else if (isTransferEncodingChunked(headers)) {
+          } else if(isTransferEncodingChunked(headers)) {
             log.debug("transfer encoding chunked");
             // do not write the http chunked protocol, let tomcat figure this out
             for(;;) {
@@ -228,7 +262,7 @@ public class ReverseProxy {
   }
 
   private static boolean hasResponseBody(HttpServletRequest req, HttpHeaders headers) {
-    if (StringUtils.equalsIgnoreCase("head", req.getMethod())) {
+    if(StringUtils.equalsIgnoreCase("head", req.getMethod())) {
       return false;
     }
     int sc = headers.statusCode();
@@ -271,7 +305,7 @@ public class ReverseProxy {
 
   private static int getChunkSize(InputStream in) {
     byte[] chunkSizeBytes = HttpUtils.nextChunkSize(in);
-    if ((chunkSizeBytes == null) || chunkSizeBytes.length == 0) {
+    if((chunkSizeBytes == null) || chunkSizeBytes.length == 0) {
       throw new ReverseProxyException("failed to read next chunk size from stream");
     }
     String chunkSizeString = new String(chunkSizeBytes);

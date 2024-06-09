@@ -43,6 +43,15 @@ public record HttpRequestHeader(
     values.add(value);
   }
 
+  // get the header case insensitive
+  private static List<String> getHeader(String name, Map<String, List<String>> headers) {
+    return headers.entrySet()
+        .stream()
+        .filter(me -> StringUtils.equalsIgnoreCase(name, me.getKey()))
+        .flatMap(me -> me.getValue().stream())
+        .toList();
+  }
+
   public static HttpRequestHeader fromRequest(HttpServletRequest req, String remoteHost, int remotePort) {
     Map<String, List<String>> headers = new LinkedHashMap<>();
     Enumeration<String> headerNames = req.getHeaderNames();
@@ -67,6 +76,33 @@ public record HttpRequestHeader(
         }
       }
     }
+    List<String> xForwardedHost = getHeader("X-Forwarded-Host", headers);
+    List<String> xForwardedProto = getHeader("X-Forwarded-Proto", headers);
+    if(xForwardedHost.isEmpty() && xForwardedProto.isEmpty()) {
+      // only set them together and don't mess with them if a proxy before us already set them (partially)
+      // not sure if those headers are supposed to be multi value? better just store the original host, protocol
+      headers.put("X-Forwarded-Host", List.of(req.getHeader("host")));
+      headers.put("X-Forwarded-Proto", List.of(req.getScheme()));
+    }
+    List<String> forwarded = getHeader("Forwarded", headers);
+    List<String> newForwarded = new ArrayList<>(forwarded);
+    newForwarded.add("by=%s;for=%s;host=%s;proto=%s".formatted(
+        req.getLocalAddr(),
+        req.getRemoteAddr(),
+        req.getHeader("host"),
+        req.getScheme()));
+    headers.put("Forwarded", newForwarded);
+    // X-Forwarded-For should be a single value header
+    String xForwardedFor = req.getHeader("X-Forwarded-For");
+    if(StringUtils.isBlank(xForwardedFor)) {
+      headers.put("X-Forwarded-For", List.of("%s,%s".formatted(req.getRemoteAddr(), req.getLocalAddr())));
+    } else {
+      headers.put("X-Forwarded-For", List.of("%s,%s".formatted(xForwardedFor, req.getLocalAddr())));
+    }
+    List<String> via = getHeader("Via", headers);
+    List<String> newVia = new ArrayList<>(via);
+    newVia.add("HTTP/1.1 %s:%s".formatted(req.getLocalAddr(), req.getLocalPort()));
+    headers.put("Via", newVia);
     return new HttpRequestHeader(req.getMethod(), req.getRequestURI(), req.getQueryString(), headers);
   }
 
