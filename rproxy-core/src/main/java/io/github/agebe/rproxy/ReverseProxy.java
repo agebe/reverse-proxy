@@ -21,6 +21,7 @@ import java.net.MalformedURLException;
 import java.net.Socket;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +83,20 @@ public class ReverseProxy {
     return result;
   }
 
+  private static boolean hasRequestBody(HttpServletRequest request) {
+    if(request.getContentLengthLong() > 0) {
+      return true;
+    }
+    Enumeration<String> teEnum = request.getHeaders("transfer-encoding");
+    while(teEnum.hasMoreElements()) {
+      String te = teEnum.nextElement();
+      if(StringUtils.equalsAnyIgnoreCase("chunked", te)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public static void forwardRequestStreamResult(
       String remoteBaseUrl,
       HttpServletRequest request,
@@ -108,11 +123,13 @@ public class ReverseProxy {
             .collect(Collectors.joining("\n")));
       }
       AtomicBoolean writerRun = new AtomicBoolean(true);
-      final ServletInputStream requestBodyInputStream = request.getInputStream();
-      final boolean chunkedUpload = requestHeader.isTransferEncodingChunked();
       try(OutputStream out = socket.getOutputStream()) {
         out.write(requestHeaderBytes);
-        requestBodyWriterThread = new Thread(() -> {
+        out.flush();
+        if(hasRequestBody(request)) {
+          final ServletInputStream requestBodyInputStream = request.getInputStream();
+          final boolean chunkedUpload = requestHeader.isTransferEncodingChunked();
+          requestBodyWriterThread = new Thread(() -> {
             try {
               byte[] buf = new byte[8192];
               long total = 0;
@@ -149,8 +166,9 @@ public class ReverseProxy {
             } finally {
               log.debug("exit");
             }
-        }, Thread.currentThread().getName() + "-request-body-writer-" + requestId);
-        requestBodyWriterThread.start();
+          }, Thread.currentThread().getName() + "-request-body-writer-" + requestId);
+          requestBodyWriterThread.start();
+        }
         // TODO try to catch and ignore (log debug) broken pipes caused by clients closing the connection
         try(InputStream in = new BufferedInputStream(socket.getInputStream(), BUF_SIZE)) {
           HeaderParser parser = new HeaderParser(in);
@@ -236,7 +254,10 @@ public class ReverseProxy {
         try {
           writerRun.set(false);
           if(requestBodyWriterThread != null) {
-            requestBodyWriterThread.interrupt();
+            requestBodyWriterThread.join(1000);
+            if(requestBodyWriterThread.isAlive()) {
+              requestBodyWriterThread.interrupt();
+            }
           }
         } catch(Exception e) {
           log.debug("failed to stop request body writer", e);
