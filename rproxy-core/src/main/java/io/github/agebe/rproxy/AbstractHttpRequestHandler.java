@@ -74,6 +74,8 @@ public abstract class AbstractHttpRequestHandler implements HttpRequestHandler {
           responseHeaderModifier,
           responseOutputStream);
       return RequestStatus.COMPLETED;
+    } catch(ReverseProxyException e) {
+      throw e;
     } catch(Exception e) {
       throw new ReverseProxyException("failed on forward", e);
     }
@@ -100,6 +102,8 @@ public abstract class AbstractHttpRequestHandler implements HttpRequestHandler {
         response.setHeader("Content-Length", Integer.toString(modified.length));
         try(OutputStream o = getResponseOutputStream(response)) {
           o.write(modified);
+        } catch(ReverseProxyException e) {
+          throw e;
         } catch (IOException e) {
           throw new ReverseProxyException("failed on forward", e);
         }

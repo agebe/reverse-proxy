@@ -14,7 +14,6 @@
 package io.github.agebe.rproxy;
 
 import java.io.BufferedInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
@@ -231,18 +230,8 @@ public class ReverseProxy {
             }
             log.debug("transfer encoding chunked, done");
           } else {
-            // not so sure about this case
             // if the server does not set a content-length nor transfer-encoding chunked header,
-            // there might not be a response body and we could end up waiting forever here.
-//            byte[] buf = new byte[BUF_SIZE];
-//            for (;;) {
-//              int read = in.read(buf);
-//              if (read == -1) {
-//                respOut.flush();
-//                break;
-//              }
-//              respOut.write(buf, 0, read);
-//            }
+            // there is probably no response body.
           }
         }
       } finally {
@@ -264,19 +253,9 @@ public class ReverseProxy {
         }
       }
     } catch(BadGatewayException e) {
-      log.error("failed to open socket, sending bad gateway to client ...", e);
-      try {
-        response.sendError(HttpServletResponse.SC_BAD_GATEWAY);
-      } catch(IOException ioException) {
-        log.warn("failed to send bad gateway http status to client", ioException);
-      }
+      throw e;
     } catch(Exception e) {
-      log.error("failed processing request", e);
-      try {
-        response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-      } catch(IOException ioException) {
-        log.warn("failed to send server error http status to client", ioException);
-      }
+      throw new InternalServerErrorException(e);
     } finally {
       log.debug("exit request '{}'", requestId);
     }

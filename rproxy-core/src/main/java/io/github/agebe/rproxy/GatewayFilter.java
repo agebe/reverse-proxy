@@ -59,12 +59,15 @@ public class GatewayFilter implements Filter {
           resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
       }
+      // if no handler has taken care of this request continue with the filter chain
+      chain.doFilter(request, response);
+    } catch(BadGatewayException e) {
+      log.warn("bad gateway", e);
+      resp.sendError(HttpServletResponse.SC_BAD_GATEWAY);
     } catch(Exception e) {
       log.error("failed to process request", e);
       resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
     }
-    // if no handler has taken care of this request continue with the filter chain
-    chain.doFilter(request, response);
   }
 
 }
